@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to read the ChangeLog from a Slackware mirror
+# A sophisticated script to read the ChangeLog from a Slackware mirror
 
 # Copyright 2016  Chris Abela <kristofru@gmail.com>, Malta
 #
@@ -21,7 +21,18 @@
 #  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 #  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+function add_app() {
+  eval which "$2" > /dev/null 2>&1 && \
+  APPMENU="$APPMENU $1"
+  APP="$APP $2"
+}
+
 URL=$( grep -v '#' /etc/slackpkg/mirrors )
+if [ $( echo $URL | wc -w ) -ne 1 ]; then
+  echo "/etc/slackpkg/mirrors is not set"
+  exit 1
+fi
+
 PROTOCOL=$( echo "$URL" | cut -f1 -d: )
 # Remove white spaces in $PROTOCOL
 PROTOCOL=$( echo $PROTOCOL | sed 's/ //g')
@@ -31,14 +42,26 @@ PROTOCOL=$( echo $PROTOCOL | sed 's/ //g')
   echo "Only one argument is allowed, exiting." && \
   exit 1
 
-if [ $# == 1 ]; then
-  # We have one argument, I will assume that the user wants it
-  which "$1" > /dev/null 2>&1
-  if [ $? == 0 ]; then
-    $1 ${URL}ChangeLog.txt
+if [ $# -eq 1 ]; then
+  # We have one argument, we will assume that the user wants it
+  if eval which "$1" > /dev/null 2>&1 ; then
+    case $1 in
+      lftp)
+	[ $PROTOCOL == http ] && \
+	  echo LFTP cannot read http && \
+	  exit 2 
+        lftp -c more ${URL}ChangeLog.txt
+        ;;
+      *)
+        [ $PROTOCOL == ftp ] && [ $1 == links ] && \
+	   echo Links cannot read ftp && \
+	   exit 2
+        $1 ${URL}ChangeLog.txt
+      esac
   else echo "$1 not found"
-  fi
   exit 2
+  fi
+  exit
 fi
 
 # User did not include any arguments, so we set up a menu to choose from 
@@ -52,99 +75,61 @@ case $PROTOCOL in
   ftp)
     # LFTP works only with FTP
     APPMENU=LFTP
-    #APP="lftp -c more"
     APP=lftp
     ;;
   *) 
-    echo Protocol not found
+    echo "Protocol $PROTOCOL is not supported" 
     exit 3
 esac
 
 # If Links/LFTP are not found we unset APPMENU and APP
-which $APP > /dev/null 2>&1
-[ $? == 0 ] || \
+which $APP > /dev/null 2>&1 || \
   unset APPMENU APP
 
 # If found, Lynx should always work
-which lynx > /dev/null 2>&1
-[ $? == 0 ] && \
+which lynx > /dev/null 2>&1 && \
   APPMENU="$APPMENU Lynx"
   APP="$APP lynx"
 
 # Check if user is using a desktop
-xrandr > /dev/null 2>&1 && DESKTOP=Y
-if [ "$DESKTOP" == Y ]; then
-  # Seamonkey
-  which seamonkey > /dev/null 2>&1  
-  if [ $? == 0 ]; then
-    APPMENU="$APPMENU Seamonkey"
-    APP="$APP seamonkey"
-  fi
-  # Firefox
-  which firefox > /dev/null 2>&1  
-  if [ $? == 0 ]; then
-    APPMENU="$APPMENU Firefox"
-    APP="$APP firefox"
-  fi
-  # Konqueror 
-  which konqueror > /dev/null 2>&1
-  if [ $? == 0 ]; then
-    APPMENU="$APPMENU Konqueror"
-    APP="$APP konqueror"
-  fi
-  # Google Chrome
-  which google-chrome-stable  > /dev/null 2>&1  
-  if [ $? == 0 ]; then
-    APPMENU="$APPMENU Chrome"
-    APP="$APP google-chrome-stable"
-  fi
+if eval xrandr > /dev/null 2>&1 ; then
+  # Feel free to edit this list
+  # This should pass two arguments to function add_app
+  # The first argument is the menu entry
+  # The second argument is the application itself
+  add_app Seamonkey seamonkey
+  add_app Firefox firefox
+  add_app Konqueror konqueror
+  add_app Chrome google-chrome-stable
 fi
 
+N=$( echo $APP | wc -w )
+[ $N -eq 0 ] && \
+  echo No Browser Found, exiting && \
+  exit 4
+DLENGTH=$(( $N * 2 + 4 ))
+
 COUNTER=0
+DIALOG="dialog --menu \"Choose Your Web Browser:\" $DLENGTH 35 $N"
 for i in $APPMENU; do
   let "COUNTER+=1"
-  eval "APPMENU${COUNTER}"=$i
+  DIALOG="$DIALOG $COUNTER $i"
 done
-
-COUNTER=0
-for i in $APP; do
-  let "COUNTER+=1"
-  eval "APP${COUNTER}"=$i
-done
-
-N=$( echo $APP | wc -w )
-dialog --menu "Choose Your Web Browser:" 12 35 "$N" \
-  1 "$APPMENU1" \
-  2 "$APPMENU2" \
-  3 "$APPMENU3" \
-  4 "$APPMENU4" \
-  5 "$APPMENU5" \
-  6 "$APPMENU6" \
-  2> /tmp/reply.ChangeLog
-
-BROWSER=$( < /tmp/reply.ChangeLog )
-rm /tmp/reply.ChangeLog
+# See this tutorial on how this works:
+# http://linuxcommand.org/lc3_adv_dialog.php
+exec 3>&1
+BROWSER=$(eval $DIALOG 2>&1 1>&3)
+exec 3>&-
 
 case $BROWSER in
-  1)
-     if [ $APPMENU1 = LFTP ]; then
+ "")
+     # The user wants to Cancel the Operation
+     exit
+     ;;
+  *) 
+     APPLICATION=$( echo $APP | awk "{ print \$$BROWSER}" )
+     if [ "$APPLICATION" = LFTP ]; then
        lftp -c more ${URL}ChangeLog.txt
-     else $APP1 ${URL}ChangeLog.txt
+     else $APPLICATION ${URL}ChangeLog.txt > /dev/null 2>&1
      fi
-     ;;
-  2)
-     $APP2 ${URL}ChangeLog.txt
-     ;;
-  3)
-     $APP3 ${URL}ChangeLog.txt > /dev/null 2>&1
-     ;;
-  4)
-     $APP4 ${URL}ChangeLog.txt > /dev/null 2>&1
-     ;;
-  5)
-     $APP5 ${URL}ChangeLog.txt > /dev/null 2>&1
-     ;;
-  6)
-     $APP6 ${URL}ChangeLog.txt > /dev/null 2>&1
-     ;;
 esac
