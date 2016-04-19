@@ -27,6 +27,14 @@ function add_app() {
   APP="$APP $2"
 }
 
+function Native() {
+  cd /tmp/
+  rm -f ChangeLog.txt
+  wget -q ${URL}ChangeLog.txt
+  dialog --title "ChangeLog.txt" \
+    --textbox ChangeLog.txt 35 80
+}
+
 URL=$( grep -v '#' /etc/slackpkg/mirrors )
 if [ $( echo $URL | wc -w ) -ne 1 ]; then
   echo "/etc/slackpkg/mirrors is not set"
@@ -58,24 +66,31 @@ if [ $# -eq 1 ]; then
 	   exit 2
         $1 ${URL}ChangeLog.txt
       esac
+  elif [ "$1" == native ]; then
+    Native
   else echo "$1 not found"
   exit 2
   fi
   exit
 fi
 
-# User did not include any arguments, so we set up a menu to choose from 
-# Let's start from the difficult ones Links v.s. LFTP:
+# User did not include any arguments, so we set up a menu to choose from
+
+# Let's start from the native browser
+APPNAME=Native
+APP=wget
+
+# Then the difficult ones: Links v.s. LFTP:
 case $PROTOCOL in
   http)
     # Links works only with http
-    APPMENU=Links
-    APP=links
+    APPMENU="$APPNAME Links"
+    APP="$APP links"
     ;;
   ftp)
     # LFTP works only with FTP
-    APPMENU=LFTP
-    APP=lftp
+    APPMENU="$APPNAME LFTP"
+    APP="$APP lftp"
     ;;
   *) 
     echo "Protocol $PROTOCOL is not supported" 
@@ -126,10 +141,15 @@ case $BROWSER in
      # The user wants to Cancel the Operation
      exit
      ;;
+  1)
+     # The user chose Native
+     Native
+     ;;
   *) 
+     # The user chose a browser
      APPLICATION=$( echo $APP | awk "{ print \$$BROWSER}" )
      if [ "$APPLICATION" = LFTP ]; then
        lftp -c more ${URL}ChangeLog.txt
-     else $APPLICATION ${URL}ChangeLog.txt > /dev/null 2>&1
+     else $APPLICATION ${URL}ChangeLog.txt 2>/dev/null
      fi
 esac
