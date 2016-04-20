@@ -92,8 +92,8 @@ case $PROTOCOL in
   ftp)
     # LFTP works only with FTP
     which lftp > /dev/null 2>&1 && \
-      APPMENU="Native LFTP"
-      APP="wget lftp"
+      APPMENU="$APPMENU LFTP"
+      APP="$APP lftp"
     ;;
   *) 
     echo "Protocol $PROTOCOL is not supported" 
