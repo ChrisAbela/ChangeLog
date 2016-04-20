@@ -33,12 +33,13 @@ function Native() {
   wget -q ${URL}ChangeLog.txt
   dialog --title "ChangeLog.txt" \
     --textbox ChangeLog.txt 35 80
+  rm -f ChangeLog.txt
 }
 
 URL=$( grep -v '#' /etc/slackpkg/mirrors )
 if [ $( echo $URL | wc -w ) -ne 1 ]; then
   echo "/etc/slackpkg/mirrors is not set"
-  exit 1
+  exit
 fi
 
 PROTOCOL=$( echo "$URL" | cut -f1 -d: )
@@ -48,7 +49,7 @@ PROTOCOL=$( echo $PROTOCOL | sed 's/ //g')
 # User chose more than one argument, this is not allowed
 [ $# -gt 1 ] && \
   echo "Only one argument is allowed, exiting." && \
-  exit 1
+  exit
 
 if [ $# -eq 1 ]; then
   # We have one argument, we will assume that the user wants it
@@ -57,19 +58,19 @@ if [ $# -eq 1 ]; then
       lftp)
 	[ $PROTOCOL == http ] && \
 	  echo LFTP cannot read http && \
-	  exit 2 
+	  exit
         lftp -c more ${URL}ChangeLog.txt
         ;;
       *)
         [ $PROTOCOL == ftp ] && [ $1 == links ] && \
 	   echo Links cannot read ftp && \
-	   exit 2
+	   exit
         $1 ${URL}ChangeLog.txt
       esac
   elif [ "$1" == native ]; then
     Native
   else echo "$1 not found"
-  exit 2
+  exit
   fi
   exit
 fi
@@ -77,29 +78,27 @@ fi
 # User did not include any arguments, so we set up a menu to choose from
 
 # Let's start from the native browser
-APPNAME=Native
+APPMENU=Native
 APP=wget
 
 # Then the difficult ones: Links v.s. LFTP:
 case $PROTOCOL in
   http)
     # Links works only with http
-    APPMENU="$APPNAME Links"
-    APP="$APP links"
+    which links > /dev/null 2>&1 && \
+      APPMENU="$APPMENU Links"
+      APP="$APP links"
     ;;
   ftp)
     # LFTP works only with FTP
-    APPMENU="$APPNAME LFTP"
-    APP="$APP lftp"
+    which lftp > /dev/null 2>&1 && \
+      APPMENU="Native LFTP"
+      APP="wget lftp"
     ;;
   *) 
     echo "Protocol $PROTOCOL is not supported" 
-    exit 3
+    exit
 esac
-
-# If Links/LFTP are not found we unset APPMENU and APP
-which $APP > /dev/null 2>&1 || \
-  unset APPMENU APP
 
 # If found, Lynx should always work
 which lynx > /dev/null 2>&1 && \
@@ -121,7 +120,7 @@ fi
 N=$( echo $APP | wc -w )
 [ $N -eq 0 ] && \
   echo No Browser Found, exiting && \
-  exit 4
+  exit
 DLENGTH=$(( $N * 2 + 4 ))
 
 COUNTER=0
@@ -147,8 +146,8 @@ case $BROWSER in
      ;;
   *) 
      # The user chose a browser
-     APPLICATION=$( echo $APP | awk "{ print \$$BROWSER}" )
-     if [ "$APPLICATION" = LFTP ]; then
+     APPLICATION=$( echo $APP | awk "{print \$$BROWSER}" )
+     if [ "$APPLICATION" == lftp ]; then
        lftp -c more ${URL}ChangeLog.txt
      else $APPLICATION ${URL}ChangeLog.txt 2>/dev/null
      fi
