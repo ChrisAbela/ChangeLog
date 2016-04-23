@@ -116,8 +116,6 @@ if eval xrandr > /dev/null 2>&1 ; then
 fi
 
 COUNTER=0
-N=$( echo $APP | wc -w )
-DLENGTH=$(( $N * 2 + 4 ))
 DIALOG="dialog --menu \"Choose Your Web Browser:\" $DLENGTH 35 $N"
 for i in $APPMENU; do
   let "COUNTER+=1"
