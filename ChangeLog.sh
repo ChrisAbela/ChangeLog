@@ -117,7 +117,7 @@ fi
 
 COUNTER=0
 N=$( echo $APP | wc -w )
-DLENGTH=$(( $N * 2 + 4 ))
+DLENGTH=$(( $N + 7 ))
 DIALOG="dialog --menu \"Choose Your Web Browser:\" $DLENGTH 35 $N"
 for i in $APPMENU; do
   let "COUNTER+=1"
