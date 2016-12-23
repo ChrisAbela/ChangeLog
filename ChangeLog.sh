@@ -23,7 +23,7 @@
 
 function add_app() {
   eval which "$2" > /dev/null 2>&1 && \
-  APPMENU="$APPMENU $1"
+  APPMENU="$APPMENU $1" && \
   APP="$APP $2"
 }
 
@@ -113,6 +113,7 @@ if eval xrandr > /dev/null 2>&1 ; then
   add_app Firefox firefox
   add_app Konqueror konqueror
   add_app Chrome google-chrome-stable
+  add_app Chromium chromium
 fi
 
 COUNTER=0
