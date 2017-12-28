@@ -81,7 +81,7 @@ APP=wget
 
 # Then the difficult ones: Links v.s. LFTP:
 case $PROTOCOL in
-  http)
+  http|https)
     # Links works only with http
     which links > /dev/null 2>&1 && \
       APPMENU="$APPMENU Links"
