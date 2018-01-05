@@ -2,7 +2,7 @@
 
 # A sophisticated script to read the ChangeLog from a Slackware mirror
 
-# Copyright 2016  Chris Abela <kristofru@gmail.com>, Malta
+# Copyright 2016, 2017  Chris Abela <kristofru@gmail.com>, Malta
 #
 # Redistribution and use of this script, with or without modification, is
 # permitted provided that the following conditions are met:
@@ -28,21 +28,34 @@ function add_app() {
 }
 
 function Native() {
-  cd /tmp/
-  rm -f ChangeLog.txt
-  wget -q ${URL}ChangeLog.txt
-  dialog --title "ChangeLog.txt" \
-    --textbox ChangeLog.txt 35 80
-  rm -f ChangeLog.txt
+  if [ "$PROTOCOL" != file ]; then
+    cd /tmp/
+    rm -f ChangeLog.txt
+    wget -q ${URL}ChangeLog.txt
+    dialog --title "ChangeLog.txt" \
+      --textbox ChangeLog.txt 35 80
+    rm -f ChangeLog.txt
+  else
+    cd $URL
+    dialog --title "ChangeLog.txt" \
+      --textbox ChangeLog.txt 35 80
+  fi
 }
 
+function editor_selection() {
+  add_app More more
+  add_app Less less
+}  
+
 URL=$( grep -v '#' /etc/slackpkg/mirrors )
+
 if [ $( echo $URL | wc -w ) -ne 1 ]; then
   echo "/etc/slackpkg/mirrors is not set"
   exit
 fi
 
 PROTOCOL=$( echo "$URL" | cut -f1 -d: | sed 's/ //g' )
+URL=$( echo $URL | sed 's/^file:\///' )
 
 # User chose more than one argument, this is not allowed
 [ $# -gt 1 ] && \
@@ -93,33 +106,40 @@ case $PROTOCOL in
       APPMENU="$APPMENU LFTP"
       APP="$APP lftp"
     ;;
+  file)
+    editor_selection 
+    ;;
   *) 
     echo "Protocol $PROTOCOL is not supported" 
     exit
 esac
 
-# If found, Lynx should always work
-which lynx > /dev/null 2>&1 && \
-  APPMENU="$APPMENU Lynx"
+# If found, Lynx should always work, but we do want it for files
+if [ $( which lynx 2> /dev/null ) -a \
+  "$PROTOCOL" != file ]; then
+  APPMENU="$APPMENU Lynx" 
   APP="$APP lynx"
+fi
 
-# Check if user is using a desktop
-if eval xrandr > /dev/null 2>&1 ; then
-  # Feel free to edit this list
-  # This should pass two arguments to function add_app
-  # The first argument is the menu entry
-  # The second argument is the application itself
-  add_app Seamonkey seamonkey
-  add_app Firefox firefox
-  add_app Konqueror konqueror
-  add_app Chrome google-chrome-stable
-  add_app Chromium chromium
+if [ "$PROTOCOL" != file ]; then
+  # Check if user is using a desktop
+  if eval xrandr > /dev/null 2>&1 ; then
+    # Feel free to edit this list
+    # This should pass two arguments to function add_app
+    # The first argument is the menu entry
+    # The second argument is the application itself
+    add_app Seamonkey seamonkey
+    add_app Firefox firefox
+    add_app Konqueror konqueror
+    add_app Chrome google-chrome-stable
+    add_app Chromium chromium
+  fi
 fi
 
 COUNTER=0
 N=$( echo $APP | wc -w )
 DLENGTH=$(( $N + 7 ))
-DIALOG="dialog --menu \"Choose Your Web Browser:\" $DLENGTH 35 $N"
+DIALOG="dialog --menu \"Choose Your Application:\" $DLENGTH 35 $N"
 for i in $APPMENU; do
   let "COUNTER+=1"
   DIALOG="$DIALOG $COUNTER $i"
@@ -144,6 +164,6 @@ case $BROWSER in
      APPLICATION=$( echo $APP | awk "{print \$$BROWSER}" )
      if [ "$APPLICATION" == lftp ]; then
        lftp -c more ${URL}ChangeLog.txt
-     else $APPLICATION ${URL}ChangeLog.txt 2>/dev/null
+     else $APPLICATION ${URL}ChangeLog.txt
      fi
 esac
